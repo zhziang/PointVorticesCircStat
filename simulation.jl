@@ -36,10 +36,11 @@ args = parse_args(aps)
 npoints = args["npoints"]
 tspan = args["tspan"]
 href = args["href"]
+isgpu = args["gpu"]
 
-circs = args["gpu"] ? [CUDA.ones(npoints ÷ 2); -CUDA.ones(npoints ÷ 2)] ./ npoints : [ones(npoints ÷ 2); -ones(npoints ÷ 2)] ./ npoints 
+circs = [ones(npoints ÷ 2); -ones(npoints ÷ 2)] ./ npoints
 
-odefunc = PeriodicPV(circs)
+odefunc = isgpu ? PeriodicPV_GPU(circs) : PeriodicPV_CPU(circs)
 
 function hamiltonian(u)
     x, y = mod.(u[:, 1], 1), mod.(u[:, 2], 1)
@@ -66,6 +67,7 @@ end
 
 u₀ = set_u₀(href)
 
+
 function isoHamiltonian_manifold(residual, u, p, t)
     residual .= href - hamiltonian(u)
     return nothing
@@ -75,7 +77,7 @@ mproj = CB.ManifoldProjection(isoHamiltonian_manifold, autodiff=NLS.AutoForwardD
 
 prob = ODE.ODEProblem(odefunc, u₀, (0, tspan))
 
-sol = @time ODE.solve(prob, ODE.Vern7(); progress=true, callback=mproj)
+sol = @time ODE.solve(prob, ODE.Vern7(); progress=true, callback = mproj)
 
 @info sol.retcode
 
