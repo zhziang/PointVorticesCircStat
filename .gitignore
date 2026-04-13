@@ -31,3 +31,6 @@ JuliaLocalPreferences.toml
 *.h5
 *.pdf
 
+# Windows cmd file
+*.cmd
+*.bat
