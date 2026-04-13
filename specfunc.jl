@@ -2,7 +2,7 @@
 @inline hvec(x, y) = begin
 	z = x + 1im*y
 	c = 1im * (conj(wζ(z)) - π * z) / (2π)
-	real(c), imag(c)
+	[real(c), imag(c)]
 end
 
 @inline green(x, y) = begin

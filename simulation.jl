@@ -6,6 +6,7 @@ import TerminalLoggers: TerminalLogger
 import SciMLBase
 global_logger(TerminalLogger())
 include("specfunc.jl")
+include("PeriodicPV.jl")
 
 #Parse argument
 aps = ArgParseSettings()
@@ -26,6 +27,9 @@ aps = ArgParseSettings()
     help = "The path of the output file."
     arg_type = String
     default = @__DIR__
+    "--gpu"
+	help = "Using GPU acceleration."
+	action = :store_true
 end
 args = parse_args(aps)
 
@@ -33,48 +37,7 @@ npoints = args["npoints"]
 tspan = args["tspan"]
 href = args["href"]
 
-mutable struct PeriodicPV <: Function
-    t::Float64
-    circs::CuArray{Float64,1}
-
-    u::CuArray{Float64,2}
-    du::CuArray{Float64,2}
-
-    function PeriodicPV(circs)
-        u = CUDA.rand(length(circs), 2)
-        du = CUDA.zeros(length(circs), 2)
-        return new(0.0, circs, u, du)
-    end
-end
-
-function update_du(du, u, circs)
-    i = (blockIdx().x - UInt32(1)) * blockDim().x + threadIdx().x
-    j = (blockIdx().y - UInt32(1)) * blockDim().y + threadIdx().y
-
-    if 1 ≤ i ≤ length(circs) && 1 ≤ j ≤ length(circs)
-        x_rel = mod(u[j, 1], 1) - mod(u[i, 1], 1)
-        y_rel = mod(u[j, 2], 1) - mod(u[i, 2], 1)
-        circ = circs[j]
-
-        du₁, du₂ = (i == j) ? (0.0, 0.0) : hvec(x_rel, y_rel) .* circ
-
-        CUDA.@atomic du[i, 1] += du₁
-        CUDA.@atomic du[i, 2] += du₂
-    end
-    return nothing
-end
-
-function (f::PeriodicPV)(du, u, p, t)
-    copyto!(f.u, u)
-    npoints = size(u, 1)
-    blocksize = 16
-    nblocks = ceil(Int, npoints / blocksize)
-    fill!(f.du, 0.0)
-    @cuda blocks = (nblocks, nblocks) threads = (blocksize, blocksize) update_du(f.du, f.u, f.circs)
-    copyto!(du, f.du)
-end
-
-circs = [CUDA.ones(npoints ÷ 2); -CUDA.ones(npoints ÷ 2)] ./ npoints
+circs = args["gpu"] ? [CUDA.ones(npoints ÷ 2); -CUDA.ones(npoints ÷ 2)] ./ npoints : [ones(npoints ÷ 2); -ones(npoints ÷ 2)] ./ npoints 
 
 odefunc = PeriodicPV(circs)
 
@@ -121,6 +84,7 @@ isdir(args["path"] * "/.output/") || mkdir(args["path"] * "/.output/")
 h5open(output_path, "w") do fid
     create_dataset(fid, "pv positions", Float64, (npoints, 2, Int(1e3)))
     create_dataset(fid, "hamiltonians", Float64, (Int(1e3),))
+    fid["circulations"] = Array(circs)
     for (n, t) in enumerate(range(0, tspan, Int(1e3)))
         fid["pv positions"][:, :, n] = Array(sol(t))
         fid["hamiltonians"][n] = hamiltonian(sol(t))

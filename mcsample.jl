@@ -16,12 +16,16 @@ aps = ArgParseSettings()
 	help = "The path of the output file."
 	arg_type = String
 	default = @__DIR__
+	"--gpu"
+	help = "Using GPU acceleration."
+	action = :store_true
 end
 args = parse_args(aps)
 npoints = args["npoints"]
 nsamples = args["nsamples"]
+dev_array = args["gpu"] ? CuArray : Array
 
-circs = [CUDA.ones(npoints÷2); -CUDA.ones(npoints÷2)] ./ npoints
+circs = dev_array([ones(npoints÷2); -ones(npoints÷2)] ./ npoints)
 
 function hamiltonian(u)
     x, y = mod.(u[:, 1], 1), mod.(u[:, 2], 1)
@@ -36,7 +40,7 @@ bin = range(-1/2npoints, 1/2npoints, 101)
 hist = zeros(length(bin) - 1)
 
 @showprogress for _ in 1:nsamples
-	idx = floor(Int, (hamiltonian(CUDA.rand(npoints,2)) - first(bin))/step(bin)) + 1
+	idx = floor(Int, (hamiltonian(dev_array(rand(npoints,2))) - first(bin))/step(bin)) + 1
 	if 1 ≤ idx ≤ length(bin)-1
 		hist[idx] += 1
 	end
