@@ -2,39 +2,20 @@ using FourierFlows, CUDA, HDF5
 
 include("utils/pv2field.jl")
 include("utils/fieldanalysis.jl")
-
-function readRawData(name)
-    us = Iterators.map(1:1000) do n
-        h5open(fid -> fid["pv positions"][:, :, n], name, "r")
-    end
-
-    circs = h5open(fid -> read(fid["circulations"]), name, "r")
-
-    return circs, us
-end
-
-function equalAreaCircRatio(data)
-    circs, us = data
-    grid = FourierFlows.TwoDGrid(CPU(), nx=256, Lx=1)
-    loopsizes = 4:4:128
+include("utils/postprocess.jl")
 
 
-    varRatio(l) = begin
-        var_sq = sum(us) do u
-            ζh = grid.rfftplan * pv2field(u, circs, grid)
-            sum(abs2, rectCirculations(ζh, l, l, grid))
-        end ./ length(us)
+basepath = dirname(@__DIR__)
 
-        var_rect = sum(us) do u
-            ζh = grid.rfftplan * pv2field(u, circs, grid)
-            sum(abs2, rectCirculations(ζh, 2l, l/2, grid))
-        end ./ length(us)
+srcFiles = Dict([
+	:VortexPair => h5open(basepath * "/.output/N256H-0.001543.h5", "r");
+	:MaxEntropy => h5open(basepath * "/.output/N256H-0.000917.h5", "r");
+	:Condensate => h5open(basepath * "/.output/N256H0.0.h5", "r")
+])
+desFile = h5open(basepath * "/postprocess.h5", "w")
 
-        var_rect / var_sq
-    end
+ngrid = 256
 
-    return loopsizes, [varRatio(l) for l in loopsizes]
-end
+grid = TwoDGrid(GPU(); nx = ngrid, Lx = 1)
 
 
-readRawData(".output/N64H0.0.h5") |> equalAreaCircRatio

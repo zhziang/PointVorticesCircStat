@@ -15,7 +15,7 @@ aps = ArgParseSettings()
 	"--path", "-p"
 	help = "The path of the output file."
 	arg_type = String
-	default = @__DIR__
+	default = dirname(@__DIR__)
 	"--gpu"
 	help = "Using GPU acceleration."
 	action = :store_true
