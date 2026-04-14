@@ -1,8 +1,6 @@
 using FourierFlows, CUDA, HDF5
-
 include("utils/pv2field.jl")
 include("utils/fieldanalysis.jl")
-include("utils/postprocess.jl")
 
 
 basepath = dirname(@__DIR__)
@@ -24,15 +22,18 @@ end
 
 grid = TwoDGrid(CPU(); nx=256, Lx=1)
 
-function rectCircMoments(ns, width, height, order)
-    res = map(ns) do n
-        estimate(srcFiles) do u, circs
-            ζh = grid.rfftplan * pv2field(u, circs, grid)
-            Γ = rectCirculations(ζh, width * n, height * n, grid)
-            sum(x -> x^order, Γ) / length(Γ)
-        end
+function rectCircMoments(u, circs, ns, width, height, order)
+    return map(ns) do n
+        ζh = grid.rfftplan * pv2field(u, circs, grid)
+        Γ = rectCirculations(ζh, width * n, height * n, grid)
+        sum(x -> x^order, Γ) / length(Γ)
     end
-
-    return getindex.(res, 1), getindex.(res, 2)
 end
 
+ns = 1:10
+var10_10 = estimate((u,circs) -> rectCircMoments(u,circs,ns,10,10,2),srcFiles)
+var5_20 = estimate((u,circs) -> rectCircMoments(u,circs,ns,5,20,2),srcFiles)
+var4_16 = estimate((u,circs) -> rectCircMoments(u,circs,ns,4,16,2),srcFiles)
+
+
+h5open("")
