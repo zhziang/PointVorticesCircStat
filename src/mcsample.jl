@@ -1,5 +1,5 @@
 using CUDA, ProgressMeter, HDF5, ArgParse
-include("specfunc.jl")
+include("utils/specfunc.jl")
 
 #Parse argument
 aps = ArgParseSettings()

@@ -5,8 +5,8 @@ import Logging: global_logger
 import TerminalLoggers: TerminalLogger
 import SciMLBase
 global_logger(TerminalLogger())
-include("specfunc.jl")
-include("PeriodicPV.jl")
+include("utils/specfunc.jl")
+include("utils/PeriodicPV.jl")
 
 #Parse argument
 aps = ArgParseSettings()
